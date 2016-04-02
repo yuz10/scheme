@@ -9,7 +9,7 @@ namespace Scheme
     {
         static void Main(string[] args)
         {
-            Node n = Parser.Parse("\"\\n\"");
+            Node n = new Node("()");
             Console.Write(n.ToString());
         }
     }

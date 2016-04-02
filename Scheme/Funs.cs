@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static Scheme.Type;
 
 namespace Scheme
 {
@@ -38,10 +39,13 @@ namespace Scheme
         }
         public static Node eq(Node a, Node b)
         {
-            if (a.type == b.type && a.content == b.content)
-                return Parser.Parse("true");
-            else return Parser.Parse("false");
+            return eq0(a, b) ? new Node("true") : new Node("false");
         }
-
+        public static bool eq0(Node a, Node b)
+        {
+            if (a.type == Null && b.type == Null)
+                return true;
+            return a.type == b.type && a.content.Equals(b.content);
+        }
     }
 }

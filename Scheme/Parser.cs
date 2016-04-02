@@ -10,43 +10,51 @@ namespace Scheme
 {
     public enum Type
     {
-        Number, String, Symbol, Pair, Null, Bool
+        Number, String, Symbol, Pair, Null, Bool, Lambda
     }
     public struct Node
     {
         public Type type;
         public object content;
+
+        public Node(string code) {
+            this = Parser.Parse(code);
+        }
         public static Node getNull() => new Node { type = Null };
         public override string ToString()
         {
-            if (type == Type.Pair)
+            switch (type)
             {
-                List<char> s = new List<char>();
-                s.Add('(');
-                Node n = this;
-                while (n.type == Type.Pair)
-                {
-                    s.AddRange(car(n).ToString());
-                    s.Add(' ');
-                    n = cdr(n);
-                }
-                if (n.type == Null)
-                {
-                    s[s.Count - 1] = ')';
-                }
-                else
-                {
-                    s.AddRange(". " + n.ToString() + ")");
-                }
-                return new string(s.ToArray());
-            }
-            else if(type==Type.String)
-            {
-                return "\"" + content + "\"";
-            }
-            else
-            {
-                return content.ToString();
+                case Type.Pair:
+                    StringBuilder s = new StringBuilder();
+                    s.Append('(');
+                    Node n = this;
+                    while (n.type == Type.Pair)
+                    {
+                        s.Append(car(n).ToString());
+                        s.Append(' ');
+                        n = cdr(n);
+                    }
+                    if (n.type == Null)
+                    {
+                        s[s.Length - 1] = ')';
+                    }
+                    else
+                    {
+                        s.Append(". ");
+                        s.Append(n.ToString());
+                        s.Append(")");
+                    }
+                    return s.ToString();
+                case Null:
+                    return "null";
+                case Bool:
+                    return ((bool)content) ? "true" : "false";
+                case Type.String:
+                    return "\"" + content + "\"";
+                default:
+                    return content.ToString();
+
             }
         }
     }
@@ -251,7 +259,7 @@ namespace Scheme
                     nList.Add(Parse(ref code));
                 }
                 Node list;
-                if (nList[nList.Count - 2].type == Symbol && (string)(nList[nList.Count - 2].content) == ".")
+                if (nList.Count > 2 && nList[nList.Count - 2].type == Symbol && (string)(nList[nList.Count - 2].content) == ".")
                 {
                     list = nList[nList.Count - 1];
                     for (int i = nList.Count - 3; i >= 0; i--)
@@ -280,16 +288,45 @@ namespace Scheme
         }
     }
     [TestClass]
-    public class UnitTest1
+    public partial class UnitTest1
     {
         [TestMethod]
-        public void TestMethod1()
+        public void TestStringParser()
         {
-            Assert.AreEqual(Parser.Parse("\"\\\\\"").ToString(), "\"\\\"");
-            Assert.AreEqual(Parser.Parse("\"\\n\"").ToString(), "\"\n\"");
-            Assert.AreEqual(Parser.Parse("\"\n\"").ToString(), "\"\n\"");
-            Assert.AreEqual(Parser.Parse("\"\\x2f\"").ToString(), "\"\x2f\"");
-            Assert.AreEqual(Parser.Parse("\"\\222\"").ToString(), "\"\u0092\"");
+            Assert.AreEqual("\"\\\"", new Node("\"\\\\\"").ToString());
+            Assert.AreEqual("\"\n\"", new Node("\"\\n\"").ToString());
+            Assert.AreEqual("\"\n\"", new Node("\"\n\"").ToString());
+            Assert.AreEqual("\"\xff\x2a\"", new Node("\"\\xFf\\x2a\"").ToString());
+            Assert.AreEqual("\"\u0092\"", new Node("\"\\222\"").ToString());
+        }
+        [TestMethod]
+        public void TestQuoteParser()
+        {
+            Assert.AreEqual("4", new Node("'4").ToString());
+            Assert.AreEqual("true", new Node("'true").ToString());
+            Assert.AreEqual("false", new Node("'false").ToString());
+            Assert.AreEqual("null", new Node("'()").ToString());
+            Assert.AreEqual("null", new Node("()").ToString());
+            Assert.AreEqual("(quote (2 3))", new Node("'(2 3)").ToString());
+        }
+        [TestMethod]
+        public void TestListParser()
+        {
+            Assert.AreEqual("((1 2) 3 (4 5))", new Node("((1 2) 3 (4 5))").ToString());
+            Assert.AreEqual("((1 . 2) 3 (4 5))", new Node("((1 . 2) 3 (4 5))").ToString());
+            Assert.AreEqual("(1 2 3 . 5)", new Node("(1 2 3 . 5)").ToString());
+            Node n = new Node("(1 . 2)");
+            Assert.AreEqual(Type.Pair, n.type);
+            Assert.IsTrue(eq0(new Node { type = Number, content = (double)1 }, ((Pair)(n.content)).car));
+            Assert.IsTrue(eq0(new Node { type = Number, content = (double)2 }, ((Pair)(n.content)).cdr));
+        }
+        [TestMethod]
+        public void TestEq()
+        {
+            Assert.IsTrue(eq0(new Node("1"), new Node("1")));
+            Assert.IsTrue(eq0(new Node("true"), new Node("true")));
+            Assert.IsTrue(eq0(new Node("null"), new Node("null")));
+            Assert.IsFalse(eq0(new Node("2"), Parser.Parse("1")));
         }
     }
 }
