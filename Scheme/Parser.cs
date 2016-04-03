@@ -17,7 +17,8 @@ namespace Scheme
         public Type type;
         public object content;
 
-        public Node(string code) {
+        public Node(string code)
+        {
             this = Parser.Parse(code);
         }
         public Node(double n)
@@ -30,7 +31,6 @@ namespace Scheme
             type = Bool;
             content = b;
         }
-  
         public static Node getNull() => new Node { type = Null };
         public override string ToString()
         {
@@ -100,17 +100,11 @@ namespace Scheme
             return c == ' ' || c == '\t' || c == '\r' || c == '\n';
         }
 
-        static unsafe public bool isNumber(char* c)
+        static unsafe public bool isNumber(string s)
         {
-            List<char> charList = new List<char>();
-            while(*c != '(' && *c != ')' && !isBlank(*c) && *c != '\0')
-            {
-                charList.Add(*c);
-                c++;
-            }
             try
             {
-                double.Parse(new string(charList.ToArray()));
+                double.Parse(s);
                 return true;
             }
             catch { return false; }
@@ -121,7 +115,7 @@ namespace Scheme
         static char[] escapeChar = { 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '\'', '\"' };
         static char[] escapeResult = { '\a', '\b', '\f', '\n', '\r', '\t', '\v', '\\', '\'', '\"' };
 
-   
+
         static Node quote(Node n)
         {
             if (n.type == Null || n.type == Bool || n.type == Number || n.type == Type.String)
@@ -130,12 +124,7 @@ namespace Scheme
             }
             else
             {
-                return cons(
-                    new Node { type = Symbol, content = "quote" },
-                    cons(
-                        n,
-                        Node.getNull()
-                        ));
+                return cons(new Node("quote"), cons(n, Node.getNull()));
             }
         }
 
@@ -155,9 +144,9 @@ namespace Scheme
                 code++;
             }
         }
-        private static unsafe string stringParse(ref char*code)
+        private static unsafe Node stringParse(ref char*code)
         {
-            List<char> charList = new List<char>();
+            StringBuilder s = new StringBuilder();
             char* end = code + 1;
             while (true)
             {
@@ -171,12 +160,12 @@ namespace Scheme
                     if (*end == 'x')// \xhh
                     {
 
-                        charList.Add((char)(Tools.hex2int(end[1]) << 4 | Tools.hex2int(end[2])));
+                        s.Append((char)(Tools.hex2int(end[1]) << 4 | Tools.hex2int(end[2])));
                         end += 3;
                     }
                     else if (*end >= '0' && *end <= '8')// \ddd
                     {
-                        charList.Add((char)((end[0] - '0') << 6 | (end[1] - '0') << 3 | (end[2] - '0')));
+                        s.Append((char)((end[0] - '0') << 6 | (end[1] - '0') << 3 | (end[2] - '0')));
                         end += 3;
                     }
                     else
@@ -185,7 +174,7 @@ namespace Scheme
                         {
                             if (*end == escapeChar[i])
                             {
-                                charList.Add(escapeResult[i]);
+                                s.Append(escapeResult[i]);
                                 break;
                             }
                         }
@@ -196,11 +185,11 @@ namespace Scheme
                 {
                     end++;
                     code = end;
-                    return new string(charList.ToArray());
+                    return new Node { type = Type.String, content = s.ToString() };
                 }
                 else
                 {
-                    charList.Add(*end);
+                    s.Append(*end);
                     end++;
                 }
             }
@@ -208,49 +197,39 @@ namespace Scheme
 
         static unsafe Node singleParse(ref char* code)
         {
-            Node node=new Node();
             if (*code == '\"')//parse a string
             {
-                node.type = Type.String;
-                node.content = stringParse(ref code);
+                return stringParse(ref code);
             }
             else
             {
-                char* end = code;
-                while (*end != '(' && *end != ')' && !Tools.isBlank(*end) && *end != '\0')
+                StringBuilder sb = new StringBuilder();
+                while (*code != '(' && *code != ')' && !Tools.isBlank(*code) && *code != '\0')
                 {
-                    end++;
+                    sb.Append(*code);
+                    code++;
                 }
-                char[] arr = new char[end - code];
-                for (int i = 0; i < arr.Length; i++)
+                string s = sb.ToString();
+                if (Tools.isNumber(s))//parse a number
                 {
-                    arr[i] = *(code + i);
-                }
-                string s = new string(arr);
-                if (Tools.isNumber(code))//parse a number
-                {
-                    node.type = Number;
-                    node.content = double.Parse(s);
+                    return new Node(double.Parse(s));
                 }
                 else//parse a symbol
                 {
                     if (s == "true" || s == "false")
                     {
-                        node.type = Bool;
-                        node.content = bool.Parse(s);
+                        return new Node(bool.Parse(s));
                     }
                     else if (s == "null")
                     {
-                        node.type = Null;
+                        return Node.getNull();
                     }
-                    else {
-                        node.type = Symbol;
-                        node.content = s;
+                    else
+                    {
+                        return new Node { type = Symbol, content = s };
                     }
                 }
-                code = end;
             }
-            return node;
         }
         static unsafe Node Parse(ref char* code)
         {
@@ -274,7 +253,7 @@ namespace Scheme
                     nList.Add(Parse(ref code));
                 }
                 Node list;
-                if (nList.Count > 2 && nList[nList.Count - 2].type == Symbol && (string)(nList[nList.Count - 2].content) == ".")
+                if (nList.Count > 2 && eq0(nList[nList.Count - 2], new Node(".")))
                 {
                     list = nList[nList.Count - 1];
                     for (int i = nList.Count - 3; i >= 0; i--)
@@ -323,6 +302,7 @@ namespace Scheme
             Assert.AreEqual("null", new Node("'()").ToString());
             Assert.AreEqual("null", new Node("()").ToString());
             Assert.AreEqual("(quote (2 3))", new Node("'(2 3)").ToString());
+            Assert.AreEqual("(quote (quote a))", new Node("''a").ToString());
         }
         [TestMethod]
         public void TestListParser()

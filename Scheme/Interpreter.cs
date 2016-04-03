@@ -126,6 +126,7 @@ namespace Scheme
         {
             return Eval(new Node(code), env).ToString();
         }
+
         public static Node Eval(Node exp, Env env)
         {
             if (exp.type == Null || exp.type == Bool || exp.type == Number || exp.type == Type.String)
@@ -151,7 +152,7 @@ namespace Scheme
                     case "define":
                         if (car(cdr(exp)).type != Symbol)
                         {
-                            throw new Exception("cannot define "+ car(cdr(exp)).ToString());
+                            throw new Exception("cannot define " + car(cdr(exp)).ToString());
                         }
                         string name = (string)car(cdr(exp)).content;
                         if (env.get(name) != null)
@@ -207,50 +208,55 @@ namespace Scheme
                             content = new Lambda { env = env, param = car(cdr(exp)), exp = car(cdr(cdr(exp))) }
                         };
                     default:
-                        Node fun = Eval(car(exp), env);
-                        exp = cdr(exp);
-                        if (fun.type == Type.Lambda)
-                        {
-                            Lambda lambda = (Lambda)fun.content;
-                            Node param = lambda.param;
-                            Env env1 = new Env(lambda.env);
-                            while (param.type != Null)
-                            {
-                                if (param.type == Type.Pair)
-                                {
-                                    env1.add((string)car(param).content, Eval(car(exp), env));
-                                    param = cdr(param);
-                                    exp = cdr(exp);
-                                }
-                                else
-                                {
-                                    env1.add((string)param.content, exp);
-                                    break;
-                                }
-                            }
-                            return Eval(lambda.exp, env1);
-                        }
-                        else if(fun.type == Fun)
-                        {
-                            List<Node> nList = new List<Node>();
-                            while (exp.type != Null)
-                            {
-                                nList.Add(Eval(car(exp), env));
-                                exp = cdr(exp);
-                            }
-                            return ((FunDelegate)fun.content)(nList);
-                        }
-                        else
-                        {
-                            throw new Exception(fun.ToString() + " is not a function");
-                        }
+                        return Apply(exp, env);
                 }
-
             }
-
+            else if (exp.type == Type.Pair)
+            {
+                return Apply(exp, env);
+            }
             return exp;
         }
-
+        static Node Apply(Node exp, Env env)
+        {
+            Node fun = Eval(car(exp), env);
+            exp = cdr(exp);
+            if (fun.type == Type.Lambda)
+            {
+                Lambda lambda = (Lambda)fun.content;
+                Node param = lambda.param;
+                Env env1 = new Env(lambda.env);
+                while (param.type != Null)
+                {
+                    if (param.type == Type.Pair)
+                    {
+                        env1.add((string)car(param).content, Eval(car(exp), env));
+                        param = cdr(param);
+                        exp = cdr(exp);
+                    }
+                    else
+                    {
+                        env1.add((string)param.content, exp);
+                        break;
+                    }
+                }
+                return Eval(lambda.exp, env1);
+            }
+            else if (fun.type == Fun)
+            {
+                List<Node> nList = new List<Node>();
+                while (exp.type != Null)
+                {
+                    nList.Add(Eval(car(exp), env));
+                    exp = cdr(exp);
+                }
+                return ((FunDelegate)fun.content)(nList);
+            }
+            else
+            {
+                throw new Exception(fun.ToString() + " is not a function");
+            }
+        }
     }
     public partial class UnitTest1
     {
@@ -265,6 +271,11 @@ namespace Scheme
             Env env1 = new Env(env);
             env1.add("y", new Node("6"));
             Assert.AreEqual("6", env1.get("y").ToString());
+        }
+        [TestMethod]
+        public void TestEvalQuote()
+        {
+            Assert.AreEqual("(quote a)", Interpreter.Eval("''a"));
         }
         [TestMethod]
         public void TestEvalAndOr()
@@ -310,7 +321,8 @@ namespace Scheme
             Assert.AreEqual("3", Interpreter.Eval("(1+ 2)", env));
             Interpreter.Eval(new Node("(define fact (lambda (x) (if (= x 1) 1 (* x (fact (- x 1))))))"), env);
             Assert.AreEqual("6", Interpreter.Eval("(fact 3)", env));
-
+            Assert.AreEqual("2", Interpreter.Eval("((lambda (x) (+ x 1)) 1)", env));
+            Assert.AreEqual("3", Interpreter.Eval("(((lambda (x) (lambda (y) (+ x y))) 1) 2)", env));
         }
     }
 }
