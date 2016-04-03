@@ -9,8 +9,26 @@ namespace Scheme
     {
         static void Main(string[] args)
         {
-            Node n = new Node("()");
-            Console.Write(n.ToString());
+            Env env = Interpreter.getBaseEnv();
+            string code = "";
+            Console.Write(">");
+            while (true)
+            {
+                code += Console.ReadLine();
+                if (code.Last() == '\t')
+                {
+                    try
+                    {
+                        Console.Write(Interpreter.Eval(code, env));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Write("error: " + e.Message);
+                    }
+                    Console.Write("\n>");
+                    code = "";
+                }
+            }
         }
     }
 }

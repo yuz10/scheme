@@ -20,6 +20,17 @@ namespace Scheme
         public Node(string code) {
             this = Parser.Parse(code);
         }
+        public Node(double n)
+        {
+            type = Number;
+            content = n;
+        }
+        public Node(bool b)
+        {
+            type = Bool;
+            content = b;
+        }
+  
         public static Node getNull() => new Node { type = Null };
         public override string ToString()
         {
@@ -321,16 +332,16 @@ namespace Scheme
             Assert.AreEqual("(1 2 3 . 5)", new Node("(1 2 3 . 5)").ToString());
             Node n = new Node("(1 . 2)");
             Assert.AreEqual(Type.Pair, n.type);
-            Assert.IsTrue(eq0(new Node { type = Number, content = (double)1 }, ((Pair)(n.content)).car));
-            Assert.IsTrue(eq0(new Node { type = Number, content = (double)2 }, ((Pair)(n.content)).cdr));
+            Assert.IsTrue(eq0(new Node(1), ((Pair)(n.content)).car));
+            Assert.IsTrue(eq0(new Node(2), ((Pair)(n.content)).cdr));
         }
         [TestMethod]
         public void TestEq()
         {
-            Assert.IsTrue(eq0(new Node("1"), new Node("1")));
+            Assert.IsTrue(eq0(new Node(1), new Node("1")));
             Assert.IsTrue(eq0(new Node("true"), new Node("true")));
             Assert.IsTrue(eq0(new Node("null"), new Node("null")));
-            Assert.IsFalse(eq0(new Node("2"), Parser.Parse("1")));
+            Assert.IsFalse(eq0(new Node(2), new Node("1")));
         }
     }
 }

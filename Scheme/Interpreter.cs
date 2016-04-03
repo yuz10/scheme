@@ -66,7 +66,7 @@ namespace Scheme
                 {
                     num = fun(num, (double)nList[i].content);
                 }
-                return new Node { type = Number, content = num };
+                return new Node(num);
             };
         }
         public static Env getBaseEnv()
@@ -88,10 +88,32 @@ namespace Scheme
                         num = num - (double)nList[i].content;
                     }
                 }
-                return new Node { type = Number, content = num };
+                return new Node(num);
             });
+            addNewFun(env, ">", (x) => {
+                Assert.IsTrue(x.Count == 2);
+                return new Node((double)x[0].content > (double)x[1].content);
+            });
+            addNewFun(env, "<", (x) => {
+                Assert.IsTrue(x.Count == 2);
+                return new Node((double)x[0].content < (double)x[1].content);
+            });
+            addNewFun(env, "=", (x) => {
+                Assert.IsTrue(x.Count == 2);
+                return new Node((double)x[0].content == (double)x[1].content);
+            });
+            addNewFun(env, ">=", (x) => {
+                Assert.IsTrue(x.Count == 2);
+                return new Node((double)x[0].content >= (double)x[1].content);
+            });
+            addNewFun(env, "<=", (x) => {
+                Assert.IsTrue(x.Count == 2);
+                return new Node((double)x[0].content <= (double)x[1].content);
+            });
+
             addNewFun(env, "car", (x) => { Assert.IsTrue(x.Count == 1); return car(x[0]); });
             addNewFun(env, "cdr", (x) => { Assert.IsTrue(x.Count == 1); return cdr(x[0]); }); 
+            addNewFun(env, "cons", (x) => { Assert.IsTrue(x.Count == 2); return cons(x[0], x[1]); }); 
             addNewFun(env, "eq?", (x) => { Assert.IsTrue(x.Count == 2); return eq(x[0], x[1]); });
 
             return env;
@@ -115,7 +137,7 @@ namespace Scheme
                 Node? res = env.get((string)exp.content);
                 if (res == null)
                 {
-                    throw new Exception("var not found");
+                    throw new Exception((string)exp.content + " not found");
                 }
                 else return (Node)res;
             }
@@ -141,11 +163,11 @@ namespace Scheme
                         return res;
                     case "and":
                         exp = cdr(exp);
-                        e = new Node("true");
+                        e = new Node(true);
                         while (exp.type != Null)
                         {
                             res = Eval(car(exp), env);
-                            if (eq0(res, new Node("false")))
+                            if (eq0(res, new Node(false)))
                                 return res;
                             e = res;
                             exp = cdr(exp);
@@ -153,11 +175,11 @@ namespace Scheme
                         return e;
                     case "or":
                         exp = cdr(exp);
-                        e = new Node("false");
+                        e = new Node(false);
                         while (exp.type != Null)
                         {
                             res = Eval(car(exp), env);
-                            if (!eq0(res, new Node("false")))
+                            if (!eq0(res, new Node(false)))
                                 return res;
                             e = res;
                             exp = cdr(exp);
@@ -165,7 +187,7 @@ namespace Scheme
                         return e;
                     case "if":
                         res = Eval(car(cdr(exp)), env);
-                        if (!eq0(res, new Node("false")))
+                        if (!eq0(res, new Node(false)))
                             return Eval(car(cdr(cdr(exp))), env);
                         else return Eval(car(cdr(cdr(cdr(exp)))), env);
                     case "cond":
@@ -173,7 +195,7 @@ namespace Scheme
                         while (exp.type != Null)
                         {
                             res = Eval(car(car(exp)), env);
-                            if (!eq0(res, new Node("false")))
+                            if (!eq0(res, new Node(false)))
                                 return Eval(car(cdr(car(exp))), env);
                             exp = cdr(exp);
                         }
@@ -196,7 +218,7 @@ namespace Scheme
                             {
                                 if (param.type == Type.Pair)
                                 {
-                                    env1.add((string)car(param).content, car(exp));
+                                    env1.add((string)car(param).content, Eval(car(exp), env));
                                     param = cdr(param);
                                     exp = cdr(exp);
                                 }
@@ -226,7 +248,7 @@ namespace Scheme
 
             }
 
-            return Node.getNull();
+            return exp;
         }
 
     }
@@ -286,6 +308,9 @@ namespace Scheme
             Env env = Interpreter.getBaseEnv();
             Interpreter.Eval(new Node("(define 1+ (lambda (x) (+ 1 x)))"), env);
             Assert.AreEqual("3", Interpreter.Eval("(1+ 2)", env));
+            Interpreter.Eval(new Node("(define fact (lambda (x) (if (= x 1) 1 (* x (fact (- x 1))))))"), env);
+            Assert.AreEqual("6", Interpreter.Eval("(fact 3)", env));
+
         }
     }
 }

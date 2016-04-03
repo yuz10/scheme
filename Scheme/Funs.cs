@@ -39,7 +39,7 @@ namespace Scheme
         }
         public static Node eq(Node a, Node b)
         {
-            return eq0(a, b) ? new Node("true") : new Node("false");
+            return eq0(a, b) ? new Node(true) : new Node(false);
         }
         public static bool eq0(Node a, Node b)
         {
