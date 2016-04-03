@@ -10,7 +10,7 @@ namespace Scheme
 {
     public enum Type
     {
-        Number, String, Symbol, Pair, Null, Bool, Lambda
+        Number, String, Symbol, Pair, Null, Bool, Lambda, Fun
     }
     public struct Node
     {
@@ -251,6 +251,10 @@ namespace Scheme
                 while (true)
                 {
                     skipBlank(ref code);
+                    if (*code == '\0')
+                    {
+                        throw new Exception("List not match");
+                    }
                     if (*code == ')')
                     {
                         code++;

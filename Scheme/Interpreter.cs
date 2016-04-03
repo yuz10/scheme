@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using static Scheme.Funs;
 using static Scheme.Type;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+
 namespace Scheme
 {
     public class Env
@@ -40,14 +41,68 @@ namespace Scheme
     }
     public class Lambda
     {
-        Env env;
-        Node exp;
+        public Env env;
+        public Node param;
+        public Node exp;
     }
+    public delegate Node FunDelegate(List<Node>nList);
     public static class Interpreter
     {
+        static void addNewFun(Env env, string name, FunDelegate fun)
+        {
+            env.add(name, new Node
+            {
+                type = Fun,
+                content = fun
+            });
+        }
+        delegate double accumDelegate(double a, double b);
+        static FunDelegate accumulateFunc(accumDelegate fun)
+        {
+            return (nList) =>
+            {
+                double num = (double)nList[0].content;
+                for (int i = 1; i < nList.Count; i++)
+                {
+                    num = fun(num, (double)nList[i].content);
+                }
+                return new Node { type = Number, content = num };
+            };
+        }
+        public static Env getBaseEnv()
+        {
+            Env env = new Env();
+            addNewFun(env, "+", accumulateFunc((a, b) => a + b));
+            addNewFun(env, "*", accumulateFunc((a, b) => a * b));
+            addNewFun(env, "/", accumulateFunc((a, b) => a / b));
+            addNewFun(env, "-", (nList) =>
+            {
+                double num = (double)nList[0].content;
+                if (nList.Count == 1)
+                {
+                    num = -num;
+                }
+                else {
+                    for (int i = 1; i < nList.Count; i++)
+                    {
+                        num = num - (double)nList[i].content;
+                    }
+                }
+                return new Node { type = Number, content = num };
+            });
+            addNewFun(env, "car", (x) => { Assert.IsTrue(x.Count == 1); return car(x[0]); });
+            addNewFun(env, "cdr", (x) => { Assert.IsTrue(x.Count == 1); return cdr(x[0]); }); 
+            addNewFun(env, "eq?", (x) => { Assert.IsTrue(x.Count == 2); return eq(x[0], x[1]); });
+
+            return env;
+        }
         public static string Eval(string code)
         {
-            return Eval(new Node(code), new Env()).ToString();
+            return Eval(code, getBaseEnv()).ToString();
+        }
+        public static string Eval(string code, Env env)
+        {
+            return Eval(new Node(code), env).ToString();
         }
         public static Node Eval(Node exp, Env env)
         {
@@ -66,15 +121,23 @@ namespace Scheme
             }
             else if (exp.type == Type.Pair && car(exp).type == Symbol)
             {
-                bool b;
-                Node res,e ;
+                Node res, e;
                 switch ((string)car(exp).content)
                 {
                     case "quote":
                         return car(cdr(exp));
                     case "define":
+                        if (car(cdr(exp)).type != Symbol)
+                        {
+                            throw new Exception("cannot define "+ car(cdr(exp)).ToString());
+                        }
+                        string name = (string)car(cdr(exp)).content;
+                        if (env.get(name) != null)
+                        {
+                            throw new Exception("cannot re-define " + car(cdr(exp)).ToString());
+                        }
                         res = Eval(car(cdr(cdr(exp))), env);
-                        env.add((string)car(cdr(exp)).content, res);
+                        env.add(name, res);
                         return res;
                     case "and":
                         exp = cdr(exp);
@@ -101,22 +164,64 @@ namespace Scheme
                         }
                         return e;
                     case "if":
-                        b = (bool)Eval(car(cdr(exp)), env).content;
-                        if (b)
+                        res = Eval(car(cdr(exp)), env);
+                        if (!eq0(res, new Node("false")))
                             return Eval(car(cdr(cdr(exp))), env);
                         else return Eval(car(cdr(cdr(cdr(exp)))), env);
                     case "cond":
                         exp = cdr(exp);
                         while (exp.type != Null)
                         {
-                            bool b2 = (bool)Eval(car(car(exp)), env).content;
-                            if (b2)
+                            res = Eval(car(car(exp)), env);
+                            if (!eq0(res, new Node("false")))
                                 return Eval(car(cdr(car(exp))), env);
                             exp = cdr(exp);
                         }
                         return Node.getNull();
-
-
+                    case "lambda":
+                        return new Node
+                        {
+                            type = Type.Lambda,
+                            content = new Lambda { env = env, param = car(cdr(exp)), exp = car(cdr(cdr(exp))) }
+                        };
+                    default:
+                        Node fun = Eval(car(exp), env);
+                        exp = cdr(exp);
+                        if (fun.type == Type.Lambda)
+                        {
+                            Lambda lambda = (Lambda)fun.content;
+                            Node param = lambda.param;
+                            Env env1 = new Env(lambda.env);
+                            while (param.type != Null)
+                            {
+                                if (param.type == Type.Pair)
+                                {
+                                    env1.add((string)car(param).content, car(exp));
+                                    param = cdr(param);
+                                    exp = cdr(exp);
+                                }
+                                else
+                                {
+                                    env1.add((string)param.content, exp);
+                                    break;
+                                }
+                            }
+                            return Eval(lambda.exp, env1);
+                        }
+                        else if(fun.type == Fun)
+                        {
+                            List<Node> nList = new List<Node>();
+                            while (exp.type != Null)
+                            {
+                                nList.Add(Eval(car(exp), env));
+                                exp = cdr(exp);
+                            }
+                            return ((FunDelegate)fun.content)(nList);
+                        }
+                        else
+                        {
+                            throw new Exception(fun.ToString() + " is not a function");
+                        }
                 }
 
             }
@@ -133,22 +238,54 @@ namespace Scheme
             Env env = new Env();
             env.add("x", new Node("(4 5)"));
             env.add("y", new Node("5"));
-            Assert.IsTrue(eq0(new Node("(4 5)"), (Node)env.get("x")));
-            Assert.IsTrue(eq0(new Node("5"), (Node)env.get("y")));
+            Assert.AreEqual("(4 5)", env.get("x").ToString());
+            Assert.AreEqual("5", env.get("y").ToString());
             Env env1 = new Env(env);
             env1.add("y", new Node("6"));
-            Assert.IsTrue(eq0(new Node("6"), (Node)env1.get("y")));
+            Assert.AreEqual("6", env1.get("y").ToString());
         }
         [TestMethod]
         public void TestEvalAndOr()
         {
-            Env env = new Env();
             Assert.AreEqual("1", Interpreter.Eval("(and 2 1)"));
             Assert.AreEqual("true", Interpreter.Eval("(and)"));
             Assert.AreEqual("false", Interpreter.Eval("(and false 1)"));
             Assert.AreEqual("1", Interpreter.Eval("(or false 1)"));
             Assert.AreEqual("false", Interpreter.Eval("(or)"));
-            Assert.AreEqual("1", Interpreter.Eval("(or 1 false)"));
+            Assert.AreEqual("2", Interpreter.Eval("(or (quote 2) false)"));
+        }
+        [TestMethod]
+        public void TestEvalIfCond()
+        {
+            Assert.AreEqual("1", Interpreter.Eval("(if 1 1 2)"));
+            Assert.AreEqual("2", Interpreter.Eval("(if false 1 2)"));
+            Assert.AreEqual("4", Interpreter.Eval("(cond (false 1) (3 4))"));
+        }
+        [TestMethod]
+        public void TestEvalDefine()
+        {
+            Env env = Interpreter.getBaseEnv();
+            Interpreter.Eval(new Node("(define x '(1 2))"), env);
+            Assert.AreEqual("(1 2)", env.get("x").ToString());
+        }
+        [TestMethod]
+        public void TestEvalFun()
+        {
+            Env env = Interpreter.getBaseEnv();
+            Assert.AreEqual("3", Interpreter.Eval("(+ 1 2)", env));
+            Assert.AreEqual("-1", Interpreter.Eval("(- 1 2)", env));
+            Assert.AreEqual("-1", Interpreter.Eval("(- 1)", env));
+            Assert.AreEqual("1", Interpreter.Eval("(car '(1 2))", env));
+            Assert.AreEqual("2", Interpreter.Eval("(cdr '(1 . 2))", env));
+            Assert.AreEqual("(2 3)", Interpreter.Eval("(cdr '(1 2 3))", env));
+            Assert.AreEqual("true", Interpreter.Eval("(eq? (+ 1 3) 4)", env));
+        }
+        [TestMethod]
+        public void TestEvalLambda()
+        {
+            Env env = Interpreter.getBaseEnv();
+            Interpreter.Eval(new Node("(define 1+ (lambda (x) (+ 1 x)))"), env);
+            Assert.AreEqual("3", Interpreter.Eval("(1+ 2)", env));
         }
     }
 }
