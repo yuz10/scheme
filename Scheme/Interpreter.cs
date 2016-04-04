@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using static Scheme.Funs;
 using static Scheme.Type;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -12,7 +9,7 @@ namespace Scheme
     public class Env
     {
         private Env parent;
-        private Dictionary<string, Node> env = new Dictionary<string, Node>();
+        public Dictionary<string, Node> env = new Dictionary<string, Node>();
         public Env()
         {
             parent = null;
@@ -36,6 +33,19 @@ namespace Scheme
             else
             {
                 return parent?.get(key);
+            }
+        }
+        public void set(string key, Node n)
+        {
+            if (env.ContainsKey(key))
+            {
+                env[key] = n;
+            }
+            else
+            {
+                if (parent == null)
+                    throw new Exception("no variable " + key);
+                parent.set(key, n);
             }
         }
     }
@@ -110,7 +120,6 @@ namespace Scheme
                 Assert.IsTrue(x.Count == 2);
                 return new Node((double)x[0].content <= (double)x[1].content);
             });
-
             addNewFun(env, "car", (x) => { Assert.IsTrue(x.Count == 1); return car(x[0]); });
             addNewFun(env, "cdr", (x) => { Assert.IsTrue(x.Count == 1); return cdr(x[0]); }); 
             addNewFun(env, "cons", (x) => { Assert.IsTrue(x.Count == 2); return cons(x[0], x[1]); }); 
@@ -126,7 +135,6 @@ namespace Scheme
         {
             return Eval(new Node(code), env).ToString();
         }
-
         public static Node Eval(Node exp, Env env)
         {
             if (exp.type == Null || exp.type == Bool || exp.type == Number || exp.type == Type.String)
@@ -144,18 +152,22 @@ namespace Scheme
             }
             else if (exp.type == Type.Pair && car(exp).type == Symbol)
             {
-                Node res, e;
+                Node res, n;
                 switch ((string)car(exp).content)
                 {
                     case "quote":
                         return car(cdr(exp));
+                    case "set!":
+                        exp = cdr(exp);
+                        env.set((string)car(exp).content, Eval(car(cdr(exp)), env));
+                        return Node.getNull();
                     case "define":
                         if (car(cdr(exp)).type != Symbol)
                         {
                             throw new Exception("cannot define " + car(cdr(exp)).ToString());
                         }
                         string name = (string)car(cdr(exp)).content;
-                        if (env.get(name) != null)
+                        if (env.env.ContainsKey(name))
                         {
                             throw new Exception("cannot re-define " + car(cdr(exp)).ToString());
                         }
@@ -164,33 +176,44 @@ namespace Scheme
                         return res;
                     case "and":
                         exp = cdr(exp);
-                        e = new Node(true);
+                        n = new Node(true);
                         while (exp.type != Null)
                         {
                             res = Eval(car(exp), env);
                             if (eq0(res, new Node(false)))
                                 return res;
-                            e = res;
+                            n = res;
                             exp = cdr(exp);
                         }
-                        return e;
+                        return n;
                     case "or":
                         exp = cdr(exp);
-                        e = new Node(false);
+                        n = new Node(false);
                         while (exp.type != Null)
                         {
                             res = Eval(car(exp), env);
                             if (!eq0(res, new Node(false)))
                                 return res;
-                            e = res;
+                            n = res;
                             exp = cdr(exp);
                         }
-                        return e;
+                        return n;
                     case "if":
                         res = Eval(car(cdr(exp)), env);
                         if (!eq0(res, new Node(false)))
                             return Eval(car(cdr(cdr(exp))), env);
                         else return Eval(car(cdr(cdr(cdr(exp)))), env);
+                    case "begin":
+                        exp = cdr(exp);
+                        Env e = env;
+                        n = Node.getNull();
+                        while (exp.type != Null)
+                        {
+                            e = new Env(e);
+                            n = Eval(car(exp), e);
+                            exp = cdr(exp);
+                        }
+                        return n;
                     case "cond":
                         exp = cdr(exp);
                         while (exp.type != Null)
@@ -205,8 +228,10 @@ namespace Scheme
                         return new Node
                         {
                             type = Type.Lambda,
-                            content = new Lambda { env = env, param = car(cdr(exp)), exp = car(cdr(cdr(exp))) }
+                            content = new Lambda { env = env, param = car(cdr(exp)), exp = cons(new Node("begin"), cdr(cdr(exp))) }
                         };
+                    case "eval":
+                        return Eval(Eval(car(cdr(exp)), env), env);
                     default:
                         return Apply(exp, env);
                 }
@@ -278,6 +303,15 @@ namespace Scheme
             Assert.AreEqual("(quote a)", Interpreter.Eval("''a"));
         }
         [TestMethod]
+        public void TestAssignment()
+        {
+            Env env = Interpreter.getBaseEnv();
+            Interpreter.Eval("(define x 1)", env);
+            Interpreter.Eval("(set! x '(2 . 3))", env);
+            Assert.AreEqual("(2 . 3)", env.get("x").ToString());
+
+        }
+        [TestMethod]
         public void TestEvalAndOr()
         {
             Assert.AreEqual("1", Interpreter.Eval("(and 2 1)"));
@@ -298,7 +332,9 @@ namespace Scheme
         public void TestEvalDefine()
         {
             Env env = Interpreter.getBaseEnv();
+            Interpreter.Eval(new Node("(define y (begin (define x 2) (* x x)))"), env);
             Interpreter.Eval(new Node("(define x '(1 2))"), env);
+            Assert.AreEqual("4", env.get("y").ToString());
             Assert.AreEqual("(1 2)", env.get("x").ToString());
         }
         [TestMethod]
@@ -323,6 +359,13 @@ namespace Scheme
             Assert.AreEqual("6", Interpreter.Eval("(fact 3)", env));
             Assert.AreEqual("2", Interpreter.Eval("((lambda (x) (+ x 1)) 1)", env));
             Assert.AreEqual("3", Interpreter.Eval("(((lambda (x) (lambda (y) (+ x y))) 1) 2)", env));
+            Assert.AreEqual("4", Interpreter.Eval("((lambda (x) (define y 3) (+ x y)) 1)", env));
+        }
+        [TestMethod]
+        public void TestEvalEval()
+        {
+            Assert.AreEqual("3", Interpreter.Eval("(eval '(+ 1 2))"));
+            Assert.AreEqual("(+ 1 2)", Interpreter.Eval("(eval ''(+ 1 2))"));
         }
     }
 }
