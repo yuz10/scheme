@@ -1,9 +1,11 @@
 ﻿using System;
-using static Scheme.Type;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
 namespace Scheme
 {
-    public static class Funs
+    static class Funs
     {
         public static Node cons(Node car, Node cdr)
         {
@@ -19,8 +21,9 @@ namespace Scheme
             {
                 return ((Pair)pair.content).car;
             }
-            else {
-                throw new Exception($"car of not a pair");
+            else
+            {
+                throw new Exception("car of not a pair");
             }
         }
         public static Node cdr(Node pair)
@@ -29,17 +32,18 @@ namespace Scheme
             {
                 return ((Pair)pair.content).cdr;
             }
-            else {
-                throw new Exception($"cdr of not a pair");
+            else
+            {
+                throw new Exception("cdr of not a pair");
             }
         }
         public static Node eq(Node a, Node b)
         {
-            return eq0(a, b) ? new Node(true) : new Node(false);
+            return Funs.eq0(a, b) ? new Node(true) : new Node(false);
         }
         public static bool eq0(Node a, Node b)
         {
-            if (a.type == Null && b.type == Null)
+            if (a.type == Type.Null && b.type == Type.Null)
                 return true;
             return a.type == b.type && a.content.Equals(b.content);
         }

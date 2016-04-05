@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using static Scheme.Funs;
-using static Scheme.Type;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Scheme
@@ -22,15 +20,15 @@ namespace Scheme
         }
         public Node(double n)
         {
-            type = Number;
+            type = Type.Number;
             content = n;
         }
         public Node(bool b)
         {
-            type = Bool;
+            type = Type.Bool;
             content = b;
         }
-        public static Node getNull() => new Node { type = Null };
+        public static Node getNull() {return new Node { type = Type.Null }; }
         public override string ToString()
         {
             switch (type)
@@ -41,11 +39,11 @@ namespace Scheme
                     Node n = this;
                     while (n.type == Type.Pair)
                     {
-                        s.Append(car(n).ToString());
+                        s.Append(Funs.car(n).ToString());
                         s.Append(' ');
-                        n = cdr(n);
+                        n = Funs.cdr(n);
                     }
-                    if (n.type == Null)
+                    if (n.type == Type.Null)
                     {
                         s[s.Length - 1] = ')';
                     }
@@ -56,9 +54,9 @@ namespace Scheme
                         s.Append(")");
                     }
                     return s.ToString();
-                case Null:
+                case Type.Null:
                     return "null";
-                case Bool:
+                case Type.Bool:
                     return ((bool)content) ? "true" : "false";
                 case Type.String:
                     return "\"" + content + "\"";
@@ -117,13 +115,13 @@ namespace Scheme
 
         static Node quote(Node n)
         {
-            if (n.type == Null || n.type == Bool || n.type == Number || n.type == Type.String)
+            if (n.type == Type.Null || n.type == Type.Bool || n.type == Type.Number || n.type == Type.String)
             {
                 return n;
             }
             else
             {
-                return cons(new Node("quote"), cons(n, Node.getNull()));
+                return Funs.cons(new Node("quote"), Funs.cons(n, Node.getNull()));
             }
         }
 
@@ -225,7 +223,7 @@ namespace Scheme
                     }
                     else
                     {
-                        return new Node { type = Symbol, content = s };
+                        return new Node { type = Type.Symbol, content = s };
                     }
                 }
             }
@@ -252,19 +250,19 @@ namespace Scheme
                     nList.Add(Parse(ref code));
                 }
                 Node list;
-                if (nList.Count > 2 && eq0(nList[nList.Count - 2], new Node(".")))
+                if (nList.Count > 2 && Funs.eq0(nList[nList.Count - 2], new Node(".")))
                 {
                     list = nList[nList.Count - 1];
                     for (int i = nList.Count - 3; i >= 0; i--)
                     {
-                        list = cons(nList[i], list);
+                        list = Funs.cons(nList[i], list);
                     }
                 }
                 else {
                     list = Node.getNull();
                     for (int i = nList.Count - 1; i >= 0; i--)
                     {
-                        list = cons(nList[i], list);
+                        list = Funs.cons(nList[i], list);
                     }
                 }
                 return list;
@@ -311,16 +309,16 @@ namespace Scheme
             Assert.AreEqual("(1 2 3 . 5)", new Node("(1 2 3 . 5)").ToString());
             Node n = new Node("(1 . 2)");
             Assert.AreEqual(Type.Pair, n.type);
-            Assert.IsTrue(eq0(new Node(1), ((Pair)(n.content)).car));
-            Assert.IsTrue(eq0(new Node(2), ((Pair)(n.content)).cdr));
+            Assert.IsTrue(Funs.eq0(new Node(1), ((Pair)(n.content)).car));
+            Assert.IsTrue(Funs.eq0(new Node(2), ((Pair)(n.content)).cdr));
         }
         [TestMethod]
         public void TestEq()
         {
-            Assert.IsTrue(eq0(new Node(1), new Node("1")));
-            Assert.IsTrue(eq0(new Node("true"), new Node("true")));
-            Assert.IsTrue(eq0(new Node("null"), new Node("null")));
-            Assert.IsFalse(eq0(new Node(2), new Node("1")));
+            Assert.IsTrue(Funs.eq0(new Node(1), new Node("1")));
+            Assert.IsTrue(Funs.eq0(new Node("true"), new Node("true")));
+            Assert.IsTrue(Funs.eq0(new Node("null"), new Node("null")));
+            Assert.IsFalse(Funs.eq0(new Node(2), new Node("1")));
         }
     }
 }
