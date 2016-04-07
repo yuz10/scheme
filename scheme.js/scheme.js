@@ -249,9 +249,14 @@ var eval = (function() {
                         }
                         return new SObject(null, Type.Null);
                     case 'lambda':
+                        var exp = cdr(n);
+                        if (cdr(exp).type == Type.Null) {
+                            exp = car(exp);
+                        } else {
+                            exp = cons(new SObject("begin"), exp);
+                        }
                         return new SObject(
-                            new Lambda(env, car(n), cons(new SObject('begin'), cdr(n))),
-                            Type.Lambda);
+                            new Lambda(env, car(n), exp), Type.Lambda);
                     case 'eval':
                         return car(n).eval(env).eval(env);
                     default:
@@ -272,14 +277,27 @@ var eval = (function() {
         if (fun.type == Type.Lambda) {
             var lambda = fun.content;
             var param = lambda.param;
-            var env = new Env(lambda.env);
+            var env1 = new Env(lambda.env);
             while (param.type != Type.Null) {
                 if (param.type == Type.Pair) {
-                    env.env[car(param).content] = car(n).eval(env);
+                    env1.env[car(param).content] = car(n).eval(env);
+                    param = cdr(param);
+                    n = cdr(n);
                 } else {
-                    env.env[param.content] = n;
+                    var nList = new Array();
+                    while (n.type != Type.Null) {
+                        nList.push(car(n).eval(env));
+                        n = cdr(n);
+                    }
+                    n = new SObject(null, Type.Null);
+                    for (var i = 0; i < nList.length; i++) {
+                        n = cons(nList[i], n);
+                    }
+                    env1.env[param.content] = n;
+                    break;
                 }
             }
+            return lambda.exp.eval(env1);
         } else if (fun.type == Type.Fun) {
             var nList = new Array();
             while (n.type != Type.Null) {
@@ -320,15 +338,15 @@ var eval = (function() {
     });
     addPrim(">", function(nList) { return new SObject(nList[0].content > nList[1].content) });
     addPrim("<", function(nList) { return new SObject(nList[0].content < nList[1].content) });
-    addPrim("=", function(nList) { return new SObject(nList[0].content = nList[1].content) });
+    addPrim("=", function(nList) { return new SObject(nList[0].content == nList[1].content) });
     addPrim(">=", function(nList) { return new SObject(nList[0].content >= nList[1].content) });
     addPrim("<=", function(nList) { return new SObject(nList[0].content <= nList[1].content) });
     addPrim("begin", function(nList) { return nList[nList.length - 1] });
     addPrim("car", function(nList) { return car(nList[0]) });
     addPrim("cdr", function(nList) { return cdr(nList[0]) });
     addPrim("cons", function(nList) { return cons(nList[0], nList[1]) });
-    addPrim("eq?", function(nList) { return new Node(eq0(nList[0], nList[1])) });
-    addPrim("null?", function(nList) { return new Node(nList[0].type == Type.Null) });
+    addPrim("eq?", function (nList) { return new SObject(eq0(nList[0], nList[1])) });
+    addPrim("null?", function (nList) { return new SObject(nList[0].type == Type.Null) });
     new SObject("(define apply (lambda (op x) (eval (cons op x))))").eval(env0);
     new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env0);
     new SObject("(define map (lambda (fn p . q)  (if (null? p) null  (cons (apply fn (cons (car p) (u-map car q)))  (apply map (cons fn (cons (cdr p) (u-map cdr q))))))))").eval(env0);
