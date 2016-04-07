@@ -7,15 +7,15 @@ namespace Scheme
 {
     static class Funs
     {
-        public static Node cons(Node car, Node cdr)
+        public static SObject cons(SObject car, SObject cdr)
         {
-            return new Node
+            return new SObject
             {
                 type = Type.Pair,
                 content = new Pair { car = car, cdr = cdr }
             };
         }
-        public static Node car(Node pair)
+        public static SObject car(SObject pair)
         {
             if (pair.type == Type.Pair)
             {
@@ -26,7 +26,7 @@ namespace Scheme
                 throw new Exception("car of not a pair");
             }
         }
-        public static Node cdr(Node pair)
+        public static SObject cdr(SObject pair)
         {
             if (pair.type == Type.Pair)
             {
@@ -37,11 +37,11 @@ namespace Scheme
                 throw new Exception("cdr of not a pair");
             }
         }
-        public static Node eq(Node a, Node b)
+        public static SObject eq(SObject a, SObject b)
         {
-            return Funs.eq0(a, b) ? new Node(true) : new Node(false);
+            return eq0(a, b) ? new SObject(true) : new SObject(false);
         }
-        public static bool eq0(Node a, Node b)
+        public static bool eq0(SObject a, SObject b)
         {
             if (a.type == Type.Null && b.type == Type.Null)
                 return true;

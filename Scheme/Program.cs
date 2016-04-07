@@ -7,7 +7,7 @@ namespace Scheme
     {
         static void Main(string[] args)
         {
-            Env env = Interpreter.getBaseEnv();
+            Env env = SObject.getBaseEnv();
             string code = "";
             Console.Write(">");
             while (true)
@@ -17,7 +17,7 @@ namespace Scheme
                 {
                     try
                     {
-                        Console.Write(Interpreter.Eval(code, env));
+                    Console.Write(new SObject(code).eval(env));
                     }
                     catch (Exception e)
                     {

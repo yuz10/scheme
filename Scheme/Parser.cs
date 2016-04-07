@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using static Scheme.Funs;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Scheme
@@ -9,26 +10,26 @@ namespace Scheme
     {
         Number, String, Symbol, Pair, Null, Bool, Lambda, Fun
     }
-    public struct Node
+    public partial struct SObject
     {
         public Type type;
         public object content;
 
-        public Node(string code)
+        public SObject(string code)
         {
             this = Parser.Parse(code);
         }
-        public Node(double n)
+        public SObject(double n)
         {
             type = Type.Number;
             content = n;
         }
-        public Node(bool b)
+        public SObject(bool b)
         {
             type = Type.Bool;
             content = b;
         }
-        public static Node getNull() {return new Node { type = Type.Null }; }
+        public static SObject getNull() { return new SObject { type = Type.Null }; }
         public override string ToString()
         {
             switch (type)
@@ -36,7 +37,7 @@ namespace Scheme
                 case Type.Pair:
                     StringBuilder s = new StringBuilder();
                     s.Append('(');
-                    Node n = this;
+                    SObject n = this;
                     while (n.type == Type.Pair)
                     {
                         s.Append(Funs.car(n).ToString());
@@ -68,8 +69,8 @@ namespace Scheme
     }
     struct Pair
     {
-        public Node car;
-        public Node cdr;
+        public SObject car;
+        public SObject cdr;
     }
     static class Tools
     {
@@ -113,7 +114,7 @@ namespace Scheme
         static char[] escapeResult = { '\a', '\b', '\f', '\n', '\r', '\t', '\v', '\\', '\'', '\"' };
 
 
-        static Node quote(Node n)
+        static SObject quote(SObject n)
         {
             if (n.type == Type.Null || n.type == Type.Bool || n.type == Type.Number || n.type == Type.String)
             {
@@ -121,11 +122,11 @@ namespace Scheme
             }
             else
             {
-                return Funs.cons(new Node("quote"), Funs.cons(n, Node.getNull()));
+                return cons(new SObject("quote"), cons(n, SObject.getNull()));
             }
         }
 
-        public static unsafe Node Parse(string code)
+        public static unsafe SObject Parse(string code)
         {
             fixed (char* ps = code)
             {
@@ -141,58 +142,57 @@ namespace Scheme
                 code++;
             }
         }
-        private static unsafe Node stringParse(ref char*code)
+        private static unsafe SObject stringParse(ref char*code)
         {
             StringBuilder s = new StringBuilder();
-            char* end = code + 1;
+            code++;
             while (true)
             {
-                if (*end == '\0')
+                if (*code == '\0')
                 {
                     throw new Exception();
                 }
-                else if (*end == '\\')
+                else if (*code == '\\')
                 {
-                    end++;
-                    if (*end == 'x')// \xhh
+                    code++;
+                    if (*code == 'x')// \xhh
                     {
 
-                        s.Append((char)(Tools.hex2int(end[1]) << 4 | Tools.hex2int(end[2])));
-                        end += 3;
+                        s.Append((char)(Tools.hex2int(code[1]) << 4 | Tools.hex2int(code[2])));
+                        code += 3;
                     }
-                    else if (*end >= '0' && *end <= '8')// \ddd
+                    else if (*code >= '0' && *code <= '8')// \ddd
                     {
-                        s.Append((char)((end[0] - '0') << 6 | (end[1] - '0') << 3 | (end[2] - '0')));
-                        end += 3;
+                        s.Append((char)((code[0] - '0') << 6 | (code[1] - '0') << 3 | (code[2] - '0')));
+                        code += 3;
                     }
                     else
                     {
                         for (int i = 0; i < escapeChar.Length; i++)
                         {
-                            if (*end == escapeChar[i])
+                            if (*code == escapeChar[i])
                             {
                                 s.Append(escapeResult[i]);
                                 break;
                             }
                         }
-                        end++;
+                        code++;
                     }
                 }
-                else if (*end == '\"')
+                else if (*code == '\"')
                 {
-                    end++;
-                    code = end;
-                    return new Node { type = Type.String, content = s.ToString() };
+                    code++;
+                    return new SObject { type = Type.String, content = s.ToString() };
                 }
                 else
                 {
-                    s.Append(*end);
-                    end++;
+                    s.Append(*code);
+                    code++;
                 }
             }
         }
 
-        static unsafe Node singleParse(ref char* code)
+        static unsafe SObject singleParse(ref char* code)
         {
             if (*code == '\"')//parse a string
             {
@@ -209,32 +209,36 @@ namespace Scheme
                 string s = sb.ToString();
                 if (Tools.isNumber(s))//parse a number
                 {
-                    return new Node(double.Parse(s));
+                    return new SObject(double.Parse(s));
                 }
                 else//parse a symbol
                 {
                     if (s == "true" || s == "false")
                     {
-                        return new Node(bool.Parse(s));
+                        return new SObject(bool.Parse(s));
                     }
                     else if (s == "null")
                     {
-                        return Node.getNull();
+                        return SObject.getNull();
                     }
                     else
                     {
-                        return new Node { type = Type.Symbol, content = s };
+                        return new SObject { type = Type.Symbol, content = s };
                     }
                 }
             }
         }
-        static unsafe Node Parse(ref char* code)
+        static unsafe SObject Parse(ref char* code)
         {
             skipBlank(ref code);
-            if (*code == '(')
+            if (*code == '\0')
+            {
+                return SObject.getNull();
+            }
+            else if (*code == '(')
             {
                 code++;
-                List<Node> nList = new List<Node>();
+                List<SObject> nList = new List<SObject>();
                 while (true)
                 {
                     skipBlank(ref code);
@@ -249,20 +253,20 @@ namespace Scheme
                     }
                     nList.Add(Parse(ref code));
                 }
-                Node list;
-                if (nList.Count > 2 && Funs.eq0(nList[nList.Count - 2], new Node(".")))
+                SObject list;
+                if (nList.Count > 2 && eq0(nList[nList.Count - 2], new SObject(".")))
                 {
                     list = nList[nList.Count - 1];
                     for (int i = nList.Count - 3; i >= 0; i--)
                     {
-                        list = Funs.cons(nList[i], list);
+                        list = cons(nList[i], list);
                     }
                 }
                 else {
-                    list = Node.getNull();
+                    list = SObject.getNull();
                     for (int i = nList.Count - 1; i >= 0; i--)
                     {
-                        list = Funs.cons(nList[i], list);
+                        list = cons(nList[i], list);
                     }
                 }
                 return list;
@@ -284,41 +288,41 @@ namespace Scheme
         [TestMethod]
         public void TestStringParser()
         {
-            Assert.AreEqual("\"\\\"", new Node("\"\\\\\"").ToString());
-            Assert.AreEqual("\"\n\"", new Node("\"\\n\"").ToString());
-            Assert.AreEqual("\"\n\"", new Node("\"\n\"").ToString());
-            Assert.AreEqual("\"\xff\x2a\"", new Node("\"\\xFf\\x2a\"").ToString());
-            Assert.AreEqual("\"\u0092\"", new Node("\"\\222\"").ToString());
+            Assert.AreEqual("\"\\\"", new SObject("\"\\\\\"").ToString());
+            Assert.AreEqual("\"\n\"", new SObject("\"\\n\"").ToString());
+            Assert.AreEqual("\"\n\"", new SObject("\"\n\"").ToString());
+            Assert.AreEqual("\"\xff\x2a\"", new SObject("\"\\xFf\\x2a\"").ToString());
+            Assert.AreEqual("\"\u0092\"", new SObject("\"\\222\"").ToString());
         }
         [TestMethod]
         public void TestQuoteParser()
         {
-            Assert.AreEqual("4", new Node("'4").ToString());
-            Assert.AreEqual("true", new Node("'true").ToString());
-            Assert.AreEqual("false", new Node("'false").ToString());
-            Assert.AreEqual("null", new Node("'()").ToString());
-            Assert.AreEqual("null", new Node("()").ToString());
-            Assert.AreEqual("(quote (2 3))", new Node("'(2 3)").ToString());
-            Assert.AreEqual("(quote (quote a))", new Node("''a").ToString());
+            Assert.AreEqual("4", new SObject("'4").ToString());
+            Assert.AreEqual("true", new SObject("'true").ToString());
+            Assert.AreEqual("false", new SObject("'false").ToString());
+            Assert.AreEqual("null", new SObject("'()").ToString());
+            Assert.AreEqual("null", new SObject("()").ToString());
+            Assert.AreEqual("(quote (2 3))", new SObject("'(2 3)").ToString());
+            Assert.AreEqual("(quote (quote a))", new SObject("''a").ToString());
         }
         [TestMethod]
         public void TestListParser()
         {
-            Assert.AreEqual("((1 2) 3 (4 5))", new Node("((1 2) 3 (4 5))").ToString());
-            Assert.AreEqual("((1 . 2) 3 (4 5))", new Node("((1 . 2) 3 (4 5))").ToString());
-            Assert.AreEqual("(1 2 3 . 5)", new Node("(1 2 3 . 5)").ToString());
-            Node n = new Node("(1 . 2)");
+            Assert.AreEqual("((1 2) 3 (4 5))", new SObject("((1 2) 3 (4 5))").ToString());
+            Assert.AreEqual("((1 . 2) 3 (4 5))", new SObject("((1 . 2) 3 (4 5))").ToString());
+            Assert.AreEqual("(1 2 3 . 5)", new SObject("(1 2 3 . 5)").ToString());
+            SObject n = new SObject("(1 . 2)");
             Assert.AreEqual(Type.Pair, n.type);
-            Assert.IsTrue(Funs.eq0(new Node(1), ((Pair)(n.content)).car));
-            Assert.IsTrue(Funs.eq0(new Node(2), ((Pair)(n.content)).cdr));
+            Assert.IsTrue(eq0(new SObject(1), ((Pair)(n.content)).car));
+            Assert.IsTrue(eq0(new SObject(2), ((Pair)(n.content)).cdr));
         }
         [TestMethod]
         public void TestEq()
         {
-            Assert.IsTrue(Funs.eq0(new Node(1), new Node("1")));
-            Assert.IsTrue(Funs.eq0(new Node("true"), new Node("true")));
-            Assert.IsTrue(Funs.eq0(new Node("null"), new Node("null")));
-            Assert.IsFalse(Funs.eq0(new Node(2), new Node("1")));
+            Assert.IsTrue(eq0(new SObject(1), new SObject("1")));
+            Assert.IsTrue(eq0(new SObject("true"), new SObject("true")));
+            Assert.IsTrue(eq0(new SObject("null"), new SObject("null")));
+            Assert.IsFalse(eq0(new SObject(2), new SObject("1")));
         }
     }
 }
