@@ -259,6 +259,10 @@ var eval = (function() {
                             new Lambda(env, car(n), exp), Type.Lambda);
                     case 'eval':
                         return car(n).eval(env).eval(env);
+                    case 'apply':
+                        var fun = car(n).eval(env);
+                        n = car(cdr(n)).eval(env);
+                        return apply(fun, n, env);
                     default:
                         return this.apply(env);
                 }
@@ -271,9 +275,7 @@ var eval = (function() {
             throw e + '\nin ' + this.toString();
         }
     }
-    SObject.prototype.apply = function(env) {
-        var fun = car(this).eval(env);
-        var n = cdr(this);
+    function apply(fun, n, env) {
         if (fun.type == Type.Lambda) {
             var lambda = fun.content;
             var param = lambda.param;
@@ -284,15 +286,7 @@ var eval = (function() {
                     param = cdr(param);
                     n = cdr(n);
                 } else {
-                    var nList = new Array();
-                    while (n.type != Type.Null) {
-                        nList.push(car(n).eval(env));
-                        n = cdr(n);
-                    }
-                    n = new SObject(null, Type.Null);
-                    for (var i = 0; i < nList.length; i++) {
-                        n = cons(nList[i], n);
-                    }
+                    
                     env1.env[param.content] = n;
                     break;
                 }
@@ -309,7 +303,21 @@ var eval = (function() {
             throw fun.toString() + " is not a function";
         }
     }
-    var env0 = new Env(null);
+    SObject.prototype.apply = function(env) {
+        var fun = car(this).eval(env);
+        var n = cdr(this);
+        var nList = new Array();
+        while (n.type != Type.Null) {
+            nList.push(car(n).eval(env));
+            n = cdr(n);
+        }
+        n = new SObject(null, Type.Null);
+        for (var i = nList.length - 1; i >= 0; i--) {
+            n = cons(nList[i], n);
+        }
+        return apply(fun, n, env);
+    }
+
     function addPrim(name, fun) {
         env0.env[name] = new SObject(fun, Type.Fun);
     }
@@ -322,36 +330,41 @@ var eval = (function() {
             return new SObject(s);
         }
     }
-    addPrim("+", accumFun(function(a, b) { return a + b; }));
-    addPrim("*", accumFun(function(a, b) { return a * b; }));
-    addPrim("/", accumFun(function(a, b) { return a / b; }));
-    addPrim("-", function(nList) {
-        var s = nList[0].content;
-        if (nList.length == 1) {
-            s = -s;
-        } else {
-            for (var i = 1; i < nList.length; i++) {
-                s = s - nList[i].content;
+    function getBaseEnv() {
+        addPrim("+", accumFun(function (a, b) { return a + b; }));
+        addPrim("*", accumFun(function (a, b) { return a * b; }));
+        addPrim("/", accumFun(function (a, b) { return a / b; }));
+        addPrim("-", function (nList) {
+            var s = nList[0].content;
+            if (nList.length == 1) {
+                s = -s;
+            } else {
+                for (var i = 1; i < nList.length; i++) {
+                    s = s - nList[i].content;
+                }
             }
-        }
-        return new SObject(s);
-    });
-    addPrim(">", function(nList) { return new SObject(nList[0].content > nList[1].content) });
-    addPrim("<", function(nList) { return new SObject(nList[0].content < nList[1].content) });
-    addPrim("=", function(nList) { return new SObject(nList[0].content == nList[1].content) });
-    addPrim(">=", function(nList) { return new SObject(nList[0].content >= nList[1].content) });
-    addPrim("<=", function(nList) { return new SObject(nList[0].content <= nList[1].content) });
-    addPrim("begin", function(nList) { return nList[nList.length - 1] });
-    addPrim("car", function(nList) { return car(nList[0]) });
-    addPrim("cdr", function(nList) { return cdr(nList[0]) });
-    addPrim("cons", function(nList) { return cons(nList[0], nList[1]) });
-    addPrim("eq?", function (nList) { return new SObject(eq0(nList[0], nList[1])) });
-    addPrim("null?", function (nList) { return new SObject(nList[0].type == Type.Null) });
-    new SObject("(define apply (lambda (op x) (eval (cons op x))))").eval(env0);
-    new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env0);
-    new SObject("(define map (lambda (fn p . q)  (if (null? p) null  (cons (apply fn (cons (car p) (u-map car q)))  (apply map (cons fn (cons (cdr p) (u-map cdr q))))))))").eval(env0);
+            return new SObject(s);
+        });
+        addPrim(">", function (nList) { return new SObject(nList[0].content > nList[1].content) });
+        addPrim("<", function (nList) { return new SObject(nList[0].content < nList[1].content) });
+        addPrim("=", function (nList) { return new SObject(nList[0].content == nList[1].content) });
+        addPrim(">=", function (nList) { return new SObject(nList[0].content >= nList[1].content) });
+        addPrim("<=", function (nList) { return new SObject(nList[0].content <= nList[1].content) });
+        addPrim("begin", function (nList) { return nList[nList.length - 1] });
+        addPrim("car", function (nList) { return car(nList[0]) });
+        addPrim("cdr", function (nList) { return cdr(nList[0]) });
+        addPrim("cons", function (nList) { return cons(nList[0], nList[1]) });
+        addPrim("eq?", function (nList) { return new SObject(eq0(nList[0], nList[1])) });
+        addPrim("null?", function (nList) { return new SObject(nList[0].type == Type.Null) });
+        //new SObject("(define apply (lambda (op x) (eval (cons op x))))").eval(env0);
+        new SObject("(define list (lambda x x))").eval(env0);
+        new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env0);
+        new SObject("(define map (lambda (fn p . q) (if (null? p) null (cons (apply fn (cons (car p) (u-map car q))) (apply map (cons fn (cons (cdr p) (u-map cdr q))))))))").eval(env0);
+    }
 
-    return function(exp) {
+    var env0 = new Env(null);
+    getBaseEnv();
+    var eval = function (exp) {
         try {
             return (new SObject(exp).eval(env0)).toString();
         }
@@ -359,4 +372,34 @@ var eval = (function() {
             return e;
         }
     }
+    eval.clearEnv = function () {
+        env0 = new Env(null);
+        getBaseEnv();
+    }
+    return eval;
 })()
+
+eval("(define x 1)");
+eval("(set! x '(2 . 3))");
+console.assert(eval("x") == "(2 . 3)");
+console.assert(eval("(and 2 1)") == "1");
+console.assert(eval("(and)") == "true");
+console.assert(eval("(and false 1)") == "false");
+console.assert(eval("(or false 1)") == "1");
+console.assert(eval("(or)") == "false");
+console.assert(eval("(or 2 false)") == "2");
+
+console.assert(eval("(cond (false 1) (3 4))") == "4");
+eval("(define y (begin (define z 2) (* z z)))");
+console.assert(eval("z") == "2");
+console.assert(eval("y") == "4");
+
+console.assert(eval("(apply + '((+ 1 2) 2 3))") == "8");
+console.assert(eval("(map (lambda (x) (+ 1 x)) '(1 2))") == "(2 3)");
+eval("(define 1+ (lambda (x) (+ 1 x)))");
+console.assert(eval("(1+ 2)") == "3");
+console.assert(eval("(((lambda (x) (lambda (y) (+ x y))) 1) 2)") == "3");
+eval("(define sum-of-square (lambda x (if (null? x) 0 (+ (* (car x) (car x)) (apply sum-of-square (cdr x))))))");
+console.assert(eval("(sum-of-square 1 2 3 4)") == "30");
+console.assert(eval("(eval '(+ 1 2))") == "3");
+eval.clearEnv();
