@@ -282,11 +282,10 @@ var eval = (function() {
             var env1 = new Env(lambda.env);
             while (param.type != Type.Null) {
                 if (param.type == Type.Pair) {
-                    env1.env[car(param).content] = car(n).eval(env);
+                    env1.env[car(param).content] = car(n);
                     param = cdr(param);
                     n = cdr(n);
                 } else {
-                    
                     env1.env[param.content] = n;
                     break;
                 }
@@ -295,7 +294,7 @@ var eval = (function() {
         } else if (fun.type == Type.Fun) {
             var nList = new Array();
             while (n.type != Type.Null) {
-                nList.push(car(n).eval(env));
+                nList.push(car(n));
                 n = cdr(n);
             }
             return fun.content(nList);
@@ -356,7 +355,6 @@ var eval = (function() {
         addPrim("cons", function (nList) { return cons(nList[0], nList[1]) });
         addPrim("eq?", function (nList) { return new SObject(eq0(nList[0], nList[1])) });
         addPrim("null?", function (nList) { return new SObject(nList[0].type == Type.Null) });
-        //new SObject("(define apply (lambda (op x) (eval (cons op x))))").eval(env0);
         new SObject("(define list (lambda x x))").eval(env0);
         new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env0);
         new SObject("(define map (lambda (fn p . q) (if (null? p) null (cons (apply fn (cons (car p) (u-map car q))) (apply map (cons fn (cons (cdr p) (u-map cdr q))))))))").eval(env0);
@@ -394,7 +392,7 @@ eval("(define y (begin (define z 2) (* z z)))");
 console.assert(eval("z") == "2");
 console.assert(eval("y") == "4");
 
-console.assert(eval("(apply + '((+ 1 2) 2 3))") == "8");
+console.assert(eval("(apply + '(1 2 3))") == "6");
 console.assert(eval("(map (lambda (x) (+ 1 x)) '(1 2))") == "(2 3)");
 eval("(define 1+ (lambda (x) (+ 1 x)))");
 console.assert(eval("(1+ 2)") == "3");

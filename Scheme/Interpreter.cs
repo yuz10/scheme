@@ -132,7 +132,7 @@ namespace Scheme
             addNewFun(env, "cons", (x) => { Assert.IsTrue(x.Count == 2); return cons(x[0], x[1]); });
             addNewFun(env, "eq?", (x) => { Assert.IsTrue(x.Count == 2); return eq(x[0], x[1]); });
             addNewFun(env, "null?", (x) => { Assert.IsTrue(x.Count == 1); return new SObject(x[0].type == Type.Null); });
-            new SObject("(define apply (lambda (op x) (eval (cons op x))))").eval(env);
+            new SObject("(define list (lambda x x))").eval(env);
             new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env);
             new SObject(@"(define map (lambda (fn p . q) 
                 (if (null? p) null 
@@ -225,6 +225,10 @@ namespace Scheme
                             };
                         case "eval":
                             return car(d).eval(env).eval(env);
+                        case "apply":
+                            SObject fun = car(d).eval(env);
+                            d = car(cdr(d)).eval(env);
+                            return apply(fun, d, env);
                         default:
                             return this.apply(env);
                     }
@@ -249,10 +253,8 @@ namespace Scheme
                 throw new Exception(e.Message + "\nIN " + this.ToString() + s);
             }
         }
-        SObject apply(Env env)
+        static SObject apply(SObject fun, SObject d, Env env)
         {
-            SObject fun = car(this).eval(env);
-            SObject d = cdr(this);
             if (fun.type == Type.Lambda)
             {
                 Lambda lambda = (Lambda)fun.content;
@@ -263,23 +265,12 @@ namespace Scheme
                 {
                     if (param.type == Type.Pair)
                     {
-                        env1.add((string)car(param).content, car(d).eval(env));
+                        env1.add((string)car(param).content, car(d));
                         param = cdr(param);
                         d = cdr(d);
                     }
                     else
                     {
-                        List<SObject> evalExp = new List<SObject>();
-                        while (d.type != Type.Null)
-                        {
-                            evalExp.Add(car(d).eval(env));
-                            d = cdr(d);
-                        }
-                        d = getNull();
-                        for (int i = evalExp.Count - 1; i >= 0; i--)
-                        {
-                            d = cons(evalExp[i], d);
-                        }
                         env1.add((string)param.content, d);
                         break;
                     }
@@ -291,7 +282,7 @@ namespace Scheme
                 List<SObject> nList = new List<SObject>();
                 while (d.type != Type.Null)
                 {
-                    nList.Add(car(d).eval(env));
+                    nList.Add(car(d));
                     d = cdr(d);
                 }
                 return ((FunDelegate)fun.content)(nList);
@@ -300,6 +291,23 @@ namespace Scheme
             {
                 throw new Exception(fun.ToString() + " is not a function");
             }
+        }
+        SObject apply(Env env)
+        {
+            SObject fun = car(this).eval(env);
+            SObject d = cdr(this);
+            List<SObject> evalExp = new List<SObject>();
+            while (d.type != Type.Null)
+            {
+                evalExp.Add(car(d).eval(env));
+                d = cdr(d);
+            }
+            d = getNull();
+            for (int i = evalExp.Count - 1; i >= 0; i--)
+            {
+                d = cons(evalExp[i], d);
+            }
+            return apply(fun, d, env);
         }
     }
     public partial class UnitTest1
@@ -361,7 +369,7 @@ namespace Scheme
             Assert.AreEqual("1", new SObject("(car '(1 2))").eval(env).ToString());
             Assert.AreEqual("2", new SObject("(cdr '(1 . 2))").eval(env).ToString());
             Assert.AreEqual("(2 3)", new SObject("(cdr '(1 2 3))").eval(env).ToString());
-            Assert.AreEqual("8", new SObject("(apply + '((+ 1 2) 2 3))").eval(env).ToString());
+            Assert.AreEqual("6", new SObject("(apply + '(1 2 3))").eval(env).ToString());
             Assert.AreEqual("true", new SObject("(eq? (+ 1 3) 4)").eval(env).ToString());
             Assert.AreEqual("true", new SObject("(eq? 'a 'a)").eval(env).ToString());
             Assert.AreEqual("true", new SObject("(eq? \"123\" \"123\")").eval(env).ToString());
