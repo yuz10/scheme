@@ -42,8 +42,11 @@ var eval = (function() {
     function IsNum(s) {
         if (s == '')
             return false;
-        var r = s.match(/\d*/i);
-        return r == s;
+        var r = s.match(/[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)(e[+-]?[0-9]+)?/i);
+        if (r == null)
+            return false;
+        else
+            return r[0] == s;
     }
     function cons(a, b) {
         return new SObject(Pair(a, b), Type.Pair);
