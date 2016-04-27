@@ -40,8 +40,6 @@ var eval = (function() {
         }
     }
     function IsNum(s) {
-        if (s == '')
-            return false;
         var r = s.match(/[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)(e[+-]?[0-9]+)?/i);
         if (r == null)
             return false;
