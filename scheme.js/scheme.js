@@ -310,11 +310,14 @@ var scheme = (function() {
             throw fun.toString() + " is not a function";
         }
     }
-    SObject.prototype.apply = function(env) {
+    SObject.prototype.apply = function (env) {
         var fun = car(this).eval(env);
         var n = cdr(this);
         var nList = new Array();
         while (n.type != Type.Null) {
+            if (n.type != Type.Pair) {
+                throw "cannot eval a pair"
+            }
             nList.push(car(n).eval(env));
             n = cdr(n);
         }
@@ -363,9 +366,26 @@ var scheme = (function() {
         addPrim("cons", function (nList) { return cons(nList[0], nList[1]) });
         addPrim("eq?", function (nList) { return new SObject(eq0(nList[0], nList[1])) });
         addPrim("null?", function (nList) { return new SObject(nList[0].type == Type.Null) });
-        new SObject("(define list (lambda x x))").eval(env0);
-        new SObject("(define u-map (lambda (op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x))))))").eval(env0);
-        new SObject("(define map (lambda (fn p . q) (if (null? p) null (cons (apply fn (cons (car p) (u-map car q))) (apply map (cons fn (cons (cdr p) (u-map cdr q))))))))").eval(env0);
+        addPrim("symbol?", function (nList) { return new SObject(nList[0].type == Type.Symbol) });
+        addPrim("pair?", function (nList) { return new SObject(nList[0].type == Type.Pair) });
+        new SObject("(define #f false)").eval(env0);
+        new SObject("(define #t true)").eval(env0);
+        new SObject("(define (caar x) (car (car x)))").eval(env0);
+        new SObject("(define (cadr x) (car (cdr x)))").eval(env0);
+        new SObject("(define (cdar x) (cdr (car x)))").eval(env0);
+        new SObject("(define (cddr x) (cdr (cdr x)))").eval(env0);
+        new SObject("(define (caaar x) (car (car (car x))))").eval(env0);
+        new SObject("(define (caadr x) (car (car (cdr x))))").eval(env0);
+        new SObject("(define (cadar x) (car (cdr (car x))))").eval(env0);
+        new SObject("(define (caddr x) (car (cdr (cdr x))))").eval(env0);
+        new SObject("(define (cdaar x) (cdr (car (car x))))").eval(env0);
+        new SObject("(define (cdadr x) (cdr (car (cdr x))))").eval(env0);
+        new SObject("(define (cddar x) (cdr (cdr (car x))))").eval(env0);
+        new SObject("(define (cdddr x) (cdr (cdr (cdr x))))").eval(env0);
+        new SObject("(define (list . x) x)").eval(env0);
+        new SObject("(define (u-map op x) (if (null? x) null (cons (op (car x)) (u-map op (cdr x)))))").eval(env0);
+        new SObject("(define (map fn p . q) (if (null? p) null (cons (apply fn (cons (car p) (u-map car q))) (apply map (cons fn (cons (cdr p) (u-map cdr q)))))))").eval(env0);
+        new SObject("(define (list? x) (or (null? x) (and (pair? x) (list? (cdr x)))))").eval(env0);
     }
 
     var env0 = new Env(null);
