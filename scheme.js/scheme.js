@@ -1,4 +1,4 @@
-var eval = (function() {
+var scheme = (function() {
     var Type = {
         Number: 'Number', String: 'String', Symbol: 'Symbol', Pair: 'Pair', Null: 'Null', Bool: 'Bool', Lambda: 'Lambda', Fun: 'Fun'
     }
@@ -194,7 +194,7 @@ var eval = (function() {
             case Type.Bool:
                 return String(this.content);
             case Type.String:
-                return '\"' + this.content + '\"';
+                return '"' + this.content + '"';
             default:
                 return String(this.type);
         }
@@ -212,12 +212,19 @@ var eval = (function() {
                         env.set(car(n).content, car(cdr(n)).eval(env));
                         return new SObject(null, Type.Null);
                     case 'define':
-                        var key = car(n).content;
-                        if (env.env[key] != undefined) {
-                            throw 'cannot re-define';
+                        if (car(n).type != Type.Pair) {//define a var
+                            var key = car(n).content;
+                            if (env.env[key] != undefined) {
+                                throw 'cannot re-define';
+                            }
+                            env.env[key] = car(cdr(n)).eval(env);
+                            return env.env[key];
+                        } else {//define a lambda
+                            var key = car(car(n)).content;
+                            var lambda = cons(new SObject("lambda", Type.Symbol), cons(cdr(car(n)), cdr(n))).eval(env);
+                            env.env[key] = lambda;
+                            return lambda;
                         }
-                        env.env[key] = car(cdr(n)).eval(env);
-                        return env.env[key];
                     case 'and':
                         var res = new SObject(true);
                         while (n.type != Type.Null) {
@@ -363,7 +370,7 @@ var eval = (function() {
 
     var env0 = new Env(null);
     getBaseEnv();
-    var eval = function (exp) {
+    var scheme = function (exp) {
         try {
             return (new SObject(exp).eval(env0)).toString();
         }
@@ -371,34 +378,34 @@ var eval = (function() {
             return e;
         }
     }
-    eval.clearEnv = function () {
+    scheme.clearEnv = function () {
         env0 = new Env(null);
         getBaseEnv();
     }
-    return eval;
+    return scheme;
 })()
 
-eval("(define x 1)");
-eval("(set! x '(2 . 3))");
-console.assert(eval("x") == "(2 . 3)");
-console.assert(eval("(and 2 1)") == "1");
-console.assert(eval("(and)") == "true");
-console.assert(eval("(and false 1)") == "false");
-console.assert(eval("(or false 1)") == "1");
-console.assert(eval("(or)") == "false");
-console.assert(eval("(or 2 false)") == "2");
+scheme("(define x 1)");
+scheme("(set! x '(2 . 3))");
+console.assert(scheme("x") == "(2 . 3)");
+console.assert(scheme("(and 2 1)") == "1");
+console.assert(scheme("(and)") == "true");
+console.assert(scheme("(and false 1)") == "false");
+console.assert(scheme("(or false 1)") == "1");
+console.assert(scheme("(or)") == "false");
+console.assert(scheme("(or 2 false)") == "2");
 
-console.assert(eval("(cond (false 1) (3 4))") == "4");
-eval("(define y (begin (define z 2) (* z z)))");
-console.assert(eval("z") == "2");
-console.assert(eval("y") == "4");
+console.assert(scheme("(cond (false 1) (3 4))") == "4");
+scheme("(define y (begin (define z 2) (* z z)))");
+console.assert(scheme("z") == "2");
+console.assert(scheme("y") == "4");
 
-console.assert(eval("(apply + '(1 2 3))") == "6");
-console.assert(eval("(map (lambda (x) (+ 1 x)) '(1 2))") == "(2 3)");
-eval("(define 1+ (lambda (x) (+ 1 x)))");
-console.assert(eval("(1+ 2)") == "3");
-console.assert(eval("(((lambda (x) (lambda (y) (+ x y))) 1) 2)") == "3");
-eval("(define sum-of-square (lambda x (if (null? x) 0 (+ (* (car x) (car x)) (apply sum-of-square (cdr x))))))");
-console.assert(eval("(sum-of-square 1 2 3 4)") == "30");
-console.assert(eval("(eval '(+ 1 2))") == "3");
-eval.clearEnv();
+console.assert(scheme("(apply + '(1 2 3))") == "6");
+console.assert(scheme("(map (lambda (x) (+ 1 x)) '(1 2))") == "(2 3)");
+scheme("(define 1+ (lambda (x) (+ 1 x)))");
+console.assert(scheme("(1+ 2)") == "3");
+console.assert(scheme("(((lambda (x) (lambda (y) (+ x y))) 1) 2)") == "3");
+scheme("(define sum-of-square (lambda x (if (null? x) 0 (+ (* (car x) (car x)) (apply sum-of-square (cdr x))))))");
+console.assert(scheme("(sum-of-square 1 2 3 4)") == "30");
+console.assert(scheme("(eval '(+ 1 2))") == "3");
+scheme.clearEnv();
